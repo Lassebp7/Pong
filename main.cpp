@@ -7,12 +7,69 @@
 
 // https://austinmorlan.com/posts/pong_clone/
 
-enum Buttons {
-    PaddleOneUp = 0,
-    PaddleOneDown,
-    PaddleTwoUp,
-    PaddleTwoDown,
-};
+Contact CheckPaddleCollision(Ball const &ball, Paddle const &paddle) {
+    float ballLeft = ball.position_.x_;
+    float ballRight = ball.position_.x_ + BALL_WIDTH;
+    float ballTop = ball.position_.y_;
+    float ballBottom = ball.position_.y_ + BALL_HEIGHT;
+
+    float paddleLeft = paddle.position_.x_;
+    float paddleRight = paddle.position_.x_ + PADDLE_WIDTH;
+    float paddleTop = paddle.position_.y_;
+    float paddleBottom = paddle.position_.y_ + PADDLE_HEIGHT;
+
+    Contact contact{};
+
+    if (ballLeft >= paddleRight)
+        return contact;
+    if (ballRight <= paddleLeft)
+        return contact;
+    if (ballTop >= paddleBottom)
+        return contact;
+    if (ballBottom <= paddleTop)
+        return contact;
+
+    float paddleRangeUpper = paddleBottom - (2.0f * PADDLE_HEIGHT / 3.0f);
+    float paddleRangeMiddle = paddleBottom - (PADDLE_HEIGHT / 3.0f);
+
+    if (ball.velocity_.x_ < 0) {
+        contact.penetration = paddleRight - ballLeft;
+    } else if (ball.velocity_.x_ > 0) {
+        contact.penetration = paddleLeft - ballRight;
+    }
+    if ((ballBottom > paddleTop) && (ballBottom < paddleRangeUpper)) {
+        contact.type = CollisionType::Top;
+    } else if ((ballBottom > paddleRangeUpper) && (ballBottom < paddleRangeMiddle)) {
+        contact.type = CollisionType::Middle;
+    } else {
+        contact.type = CollisionType::Bottom;
+    }
+
+    return contact;
+}
+
+Contact CheckWallCollision(Ball const &ball) {
+    float ballLeft = ball.position_.x_;
+    float ballRight = ball.position_.x_ + BALL_WIDTH;
+    float ballTop = ball.position_.y_;
+    float ballBottom = ball.position_.y_ + BALL_HEIGHT;
+
+    Contact contact{};
+
+    if (ballLeft < 0.0f) {
+        contact.type = CollisionType::Left;
+    } else if (ballRight > WINDOW_WIDTH) {
+        contact.type = CollisionType::Right;
+    } else if (ballTop < 0.0f) {
+        contact.type = CollisionType::Top;
+        contact.penetration = -ballTop;
+    } else if (ballBottom > WINDOW_HEIGHT) {
+        contact.type = CollisionType::Bottom;
+        contact.penetration = WINDOW_HEIGHT - ballBottom;
+    }
+
+    return contact;
+}
 
 int main(int argc, char *argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
@@ -29,7 +86,8 @@ int main(int argc, char *argv[]) {
     PlayerScore player2Score(Vec2((3 * WINDOW_WIDTH) / 4, 20), renderer, scoreFont);
 
     // Create ball
-    Ball ball(Vec2((WINDOW_WIDTH / 2.0f) - (BALL_WIDTH / 2.0f), (WINDOW_HEIGHT / 2.0f) - (BALL_WIDTH / 2.0f)));
+    Ball ball(Vec2((WINDOW_WIDTH / 2.0f) - (BALL_WIDTH / 2.0f), (WINDOW_HEIGHT / 2.0f) - (BALL_WIDTH / 2.0f)),
+              Vec2(BALL_SPEED, 0.0f));
 
     // Create paddles, with start speed 0
     Paddle paddle1(Vec2(50.0f, (WINDOW_HEIGHT / 2.0f) - (PADDLE_HEIGHT / 2.0f)),
@@ -39,6 +97,9 @@ int main(int argc, char *argv[]) {
 
     bool running = true;
     bool buttons[4] = {};
+
+    int player1ScoreCounter = 0;
+    int player2ScoreCounter = 0;
 
     float dt = 0.0f;
 
@@ -95,6 +156,29 @@ int main(int argc, char *argv[]) {
 
         paddle1.Update(dt);
         paddle2.Update(dt);
+
+        ball.Update(dt);
+
+        // Check collisions
+
+        if (Contact contact = CheckPaddleCollision(ball, paddle1);
+            contact.type != CollisionType::None) {
+            ball.CollideWithPaddle(contact);
+        } else if (contact = CheckPaddleCollision(ball, paddle2);
+                   contact.type != CollisionType::None) {
+            ball.CollideWithPaddle(contact);
+        } else if (contact = CheckWallCollision(ball);
+                   contact.type != CollisionType::None) {
+            ball.CollideWithWall(contact);
+
+            if (contact.type == CollisionType::Left) {
+                ++player2ScoreCounter;
+                player2Score.SetScore(player2ScoreCounter);
+            } else if (contact.type == CollisionType::Right) {
+                ++player1ScoreCounter;
+                player1Score.SetScore(player1ScoreCounter);
+            }
+        }
 
         SDL_SetRenderDrawColor(renderer, 0x0, 0x0, 0x0, 0xFF);
         SDL_RenderClear(renderer);

@@ -1,12 +1,7 @@
 #pragma once
+#include "constants.h"
 #include "vec2.h"
 #include <SDL2/SDL.h>
-
-const int PADDLE_WIDTH = 8;
-const int PADDLE_HEIGHT = 100;
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
-const float PADDLE_SPEED = 1.0f;
 
 class Paddle {
 public:
